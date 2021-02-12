@@ -27,6 +27,9 @@ class ActorCritic(tf.keras.Model):
         self.mp2 = layers.MaxPool2D((3, 3), strides=2)
         self.conv4 = layers.Conv2D(192, (3, 3), activation='relu')
 
+        # flatten
+        self.flatten = layers.Flatten()
+
         # common hidden FC layer
         self.common = layers.Dense(1024, activation="relu")
 
@@ -43,6 +46,7 @@ class ActorCritic(tf.keras.Model):
         x = self.conv3(x)
         x = self.mp2(x)
         x = self.conv4(x)
+        x = self.flatten(x)
         x = self.common(x)
 
         return self.actor(x), self.critic(x)

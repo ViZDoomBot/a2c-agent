@@ -28,7 +28,7 @@ def test():
         action_probs_raw=np.array([[0.2, 0.8], [0.5, 0.5]]),
         action_probs=np.array([0.8, 0.5]),
         values=np.array([1.0, 2.0]),
-        discounted_returns=np.array([0.8, 2.2]),
+        returns=np.array([0.8, 2.2]),
         entropy_coff=0.0001,
     )
     print(loss)

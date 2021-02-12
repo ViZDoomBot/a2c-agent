@@ -8,10 +8,11 @@
 import time
 import vizdoom as vzd
 import numpy as np
+import tensorflow as tf
 
 from a2c_common.utils import process_frame
 from a2c_common.i_reward_shaper import IRewardShaper
-from typing import List
+from typing import List, Tuple
 
 
 class GameWrapper:
@@ -19,7 +20,7 @@ class GameWrapper:
             self,
             scenario_cfg_path: str,
             action_list: List[List[bool]],
-            preprocess_shape=(60, 80),
+            preprocess_shape=(120, 120),
             frames_to_skip=4,
             history_length=4,
             visible=False,
@@ -48,9 +49,9 @@ class GameWrapper:
         self.state = None
         self.frame = None
 
-    def reset(self):
+    def reset(self) -> np.ndarray:
         """
-        Resets the environment
+        Resets the environment and return initial state.
         """
         self.env.new_episode()
         init_state = self.env.get_state()
@@ -61,23 +62,28 @@ class GameWrapper:
         # For the initial state, we stack the first frame history_length times
         self.state = np.repeat(process_frame(self.frame, self.preprocess_shape), self.history_length, axis=-1)
 
-    def step(self, action, smooth_rendering=False):
+        return self.get_state()
+
+    def get_state(self) -> np.ndarray:
+        return self.state.copy()
+
+    def step(self, action, smooth_rendering=False) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
         """Performs an action and observes the result
         Arguments:
             action: An integer describe action the agent chose
             smooth_rendering: Whether render intermediate states to make game looks smoother;
                 skip rendering tics could potentially expedite training
         Returns:
-            processed_frame: The processed new frame as a result of that action
+            state: New game state as a result of that action
             reward: The reward for taking that action
-            terminal: Whether the game has ended
+            done: Whether the game has ended
             shaping_reward: Optional shaping reward for training. Applicable only if
                 self.reward_shaper is not None
         """
         if not smooth_rendering:
             # make_action will not update(render) skipped tics
             reward = self.env.make_action(self.action_list[action], self.frames_to_skip)
-            terminal = self.env.is_episode_finished()
+            done = self.env.is_episode_finished()
             state = self.env.get_state()
             new_frame = state.screen_buffer if state is not None else self.frame
             shaping_reward = self.reward_shaper.calc_reward(state.game_variables) \
@@ -86,12 +92,12 @@ class GameWrapper:
             self.env.set_action(self.action_list[action])
             reward = 0.0
             new_frame = self.frame
-            terminal = self.env.is_episode_finished()
+            done = self.env.is_episode_finished()
             new_vars = self.env.get_state().game_variables
             for _ in range(self.frames_to_skip):
                 self.env.advance_action()
-                terminal = self.env.is_episode_finished()
-                if terminal:
+                done = self.env.is_episode_finished()
+                if done:
                     break
                 else:
                     reward += self.env.get_last_reward()
@@ -104,7 +110,20 @@ class GameWrapper:
         processed_frame = process_frame(new_frame, self.preprocess_shape)
         self.state = np.append(self.state[:, :, 1:], processed_frame, axis=-1)
 
-        return processed_frame, reward, terminal, shaping_reward
+        return self.get_state().astype('float32'), \
+               np.array(reward, dtype='float32'), \
+               np.array(done, dtype='bool'), \
+               np.array(shaping_reward, dtype='float32')
+
+    def tf_step(self, action: tf.Tensor, smooth_rendering: tf.Tensor = tf.constant(False)) -> List[tf.Tensor]:
+        """
+        Wrap step into a tf function.
+        """
+        return tf.numpy_function(
+            self.step,
+            [action, smooth_rendering],
+            [tf.float32, tf.float32, tf.bool, tf.float32],
+        )
 
     def stop(self):
         """

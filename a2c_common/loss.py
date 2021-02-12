@@ -16,7 +16,7 @@ def compute_loss(
         action_probs_raw: tf.Tensor,
         action_probs: tf.Tensor,
         values: tf.Tensor,
-        discounted_returns: tf.Tensor,
+        returns: tf.Tensor,
         entropy_coff: float = 0.0001
 ):
     """
@@ -24,12 +24,12 @@ def compute_loss(
     :param action_probs_raw: shape (batch_size, num_actions), raw outputs of policy network.
     :param action_probs: shape (batch_size,), selected action probs of true actions taken by agent for the episode.
     :param values: shape (batch_size,), outputs of value network.
-    :param discounted_returns: shape (batch_size,), discounted expected rewards for each time step of the episode.
+    :param returns: shape (batch_size,), discounted expected rewards for each time step of the episode.
     :param entropy_coff: coefficient for entropy loss.
     :return: the computed total loss.
     """
     # compute actor loss (policy loss + entropy loss)
-    advantages = discounted_returns - values
+    advantages = returns - values
     action_log_probs = tf.math.log(action_probs)
     policy_loss = tf.math.reduce_mean(action_log_probs * advantages)
     action_log_probs_raw = tf.math.log(action_probs_raw)
@@ -42,7 +42,7 @@ def compute_loss(
     # print('actor_loss:', actor_loss)
 
     # compute critic loss
-    critic_loss = tf.cast(_huber_loss(discounted_returns, values), dtype='float32')
+    critic_loss = tf.cast(_huber_loss(returns, values), dtype='float32')
     # print('critic_loss:', critic_loss)
 
     return actor_loss + critic_loss
