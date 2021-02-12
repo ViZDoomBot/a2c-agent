@@ -63,7 +63,7 @@ def train():
                 t.set_description(f'Episode {i}')
                 t.set_postfix(
                     episode_reward=episode_reward)
-    except KeyboardInterrupt:
+    except:
         agent.save(SAVE_PATH)
 
     agent.save(SAVE_PATH)

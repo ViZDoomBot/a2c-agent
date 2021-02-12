@@ -9,6 +9,9 @@ import cv2
 import numpy as np
 import tensorflow as tf
 
+# Small epsilon value for stabilizing division operations
+_eps = np.finfo(np.float32).eps.item()
+
 
 def process_frame(frame, shape=(120, 120), normalize=True):
     """Preprocesses a frame to shape[0] x shape[1] x 1 grayscale
@@ -38,6 +41,7 @@ def get_expected_return(
         dones: tf.Tensor,
         next_value: tf.Tensor,
         gamma: float,
+        standardize: bool = True,
 ) -> tf.Tensor:
     """
     Compute expected returns per timestep.
@@ -45,6 +49,8 @@ def get_expected_return(
     :param dones:
     :param next_value: the value of the next state given by the critic network.
     :param gamma
+    :param standardize: whether standardize the resulting sequence of returns or not
+     (i.e. to have zero mean and unit standard deviation).
     :return:
     """
     n = tf.shape(rewards)[0]
@@ -61,5 +67,8 @@ def get_expected_return(
         prev_returns_i.set_shape(prev_returns_i_shape)
 
     returns = returns.stack()[::-1]
+
+    if standardize:
+        returns = (returns - tf.math.reduce_mean(returns)) / (tf.math.reduce_std(returns) + _eps)
 
     return returns

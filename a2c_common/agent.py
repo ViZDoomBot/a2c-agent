@@ -68,13 +68,14 @@ class A2CAgent(object):
             # run the model and to get action probabilities and critic value
             state = tf.expand_dims(state, axis=0)
             action_probs_raw_t, value = self.model(state)
+            # print(action_probs_raw_t)
+            # print(value)
 
             # sample next action from the action probability distribution
             action = tf.random.categorical(action_probs_raw_t, 1)[0, 0]
-            # print(action_probs_raw_t)
             action_probs_t = action_probs_raw_t[0, action]
 
-            action_probs_raw = action_probs_raw.write(t, action_probs_raw_t)
+            action_probs_raw = action_probs_raw.write(t, action_probs_raw_t[0])
             action_probs = action_probs.write(t, action_probs_t)
             values = values.write(t, tf.squeeze(value))
 
@@ -116,7 +117,8 @@ class A2CAgent(object):
             optimizer: tf.keras.optimizers.Optimizer,
             gamma: float = 0.99,
             entropy_coff: float = 0.0001,
-            reward_shaping: bool = False
+            reward_shaping: bool = False,
+            clip_norm: float = 5.0,
     ) -> tf.Tensor:
         """
         Run a model training episode for max_steps_per_episode steps.
@@ -126,6 +128,7 @@ class A2CAgent(object):
         :param gamma
         :param entropy_coff
         :param reward_shaping
+        :param clip_norm
         :return:
         """
         # divide episode steps into batches (ignoring remainder)
@@ -149,9 +152,11 @@ class A2CAgent(object):
                 # print("dones:", dones)
                 # print("next_value:", next_value)
                 # print("returns:", returns)
-                # tf.print("loss:", loss)
+                tf.print("loss:", loss)
 
             grads = tape.gradient(loss, self.model.trainable_variables)
+            grads, global_norm = tf.clip_by_global_norm(grads, clip_norm)
+            print("grads global norm:", global_norm)
             optimizer.apply_gradients(zip(grads, self.model.trainable_variables))
             batch_reward = tf.math.reduce_sum(rewards)
             episode_reward += batch_reward
