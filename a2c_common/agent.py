@@ -164,6 +164,24 @@ class A2CAgent(object):
 
         return episode_reward
 
+    def evaluation_step(
+            self,
+            stochastic: bool = True,
+    ) -> float:
+        """
+        Perform one evaluation episode and return reward.
+        :param stochastic: whether use stochastic policy or deterministic policy.
+        :return: evaluation reward.
+        """
+        state = self.game.reset()
+        reward = 0.0
+        done = False
+        while not done:
+            action = self.get_action(state, stochastic)
+            state, r, done, _ = self.game.step(action, smooth_rendering=True)
+            reward += float(r)
+        return reward
+
     def save(self, folder_name):
         """
         Save model.
