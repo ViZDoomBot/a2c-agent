@@ -25,7 +25,7 @@ def test():
     model.summary()
 
     loss = compute_loss(
-        action_probs_raw=np.array([[0.2, 0.8], [0.5, 0.5]]),
+        action_dists=np.array([[0.2, 0.8], [0.5, 0.5]]),
         action_probs=np.array([0.8, 0.5]),
         values=np.array([1.0, 2.0]),
         returns=np.array([0.8, 2.2]),

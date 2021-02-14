@@ -62,4 +62,4 @@ def evaluate(episodes_to_eval: int = 10, stochastic: bool = True):
 
 
 if __name__ == '__main__':
-    evaluate(10, stochastic=False)
+    evaluate(10, stochastic=True)

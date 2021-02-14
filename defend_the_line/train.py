@@ -1,9 +1,9 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-# @File  : evaluate.py.py
+# @File  : train.py.py
 # @Author: harry
-# @Date  : 2/12/21 5:51 PM
-# @Desc  : Evaluate the agent
+# @Date  : 2/12/21 5:56 AM
+# @Desc  : Train A2C agent
 
 import sys
 import os
@@ -23,14 +23,14 @@ from constants import *
 from params import *
 
 
-def evaluate(episodes_to_eval: int = 10, stochastic: bool = True):
+def train():
     # create game env
     game = GameWrapper(
         SCENARIO_CFG_PATH, ACTION_LIST,
         (RESIZED_HEIGHT, RESIZED_WIDTH),
         FRAMES_TO_SKIP, HISTORY_LENGTH,
-        visible=True,
-        is_sync=False,
+        visible=VISIBLE_TRAINING,
+        is_sync=True,
         reward_shaper=None,
     )
 
@@ -42,24 +42,32 @@ def evaluate(episodes_to_eval: int = 10, stochastic: bool = True):
     # create agent and try to load model
     agent = A2CAgent(model, game, NUM_ACTIONS)
     if LOAD_PATH is None or not os.path.exists(LOAD_PATH):
-        print('WARNING: No saved model found, evaluating untrained model')
+        print('No saved model found, training from scratch')
     else:
         agent.load(LOAD_PATH)
         print(f'Model loaded from {LOAD_PATH}')
 
-    # evaluation loop
-    rewards = []
-    with tqdm.trange(episodes_to_eval) as t:
-        for i in t:
-            r = agent.evaluation_step(stochastic)
-            rewards.append(r)
-            t.set_description(f'Episode {i}')
-            t.set_postfix(
-                episode_reward=r)
+    # create optimizer
+    optimizer = tf.keras.optimizers.RMSprop(LEARNING_RATE)
 
-    rewards = np.array(rewards, dtype=np.float32)
-    print(f'avg: {rewards.mean()}, std: {rewards.std()}, min: {rewards.min()}, max: {rewards.max()}')
+    # train loop
+    try:
+        with tqdm.trange(TOTAL_EPISODES) as t:
+            for i in t:
+                _ = game.reset()
+                episode_reward = float(agent.train_step(
+                    MAX_STEPS_PER_EPISODE, BATCH_SIZE,
+                    optimizer, DISCOUNT_FACTOR, ENTROPY_COFF,
+                    reward_shaping=False,
+                ))
+                t.set_description(f'Episode {i}')
+                t.set_postfix(
+                    episode_reward=episode_reward)
+    except:
+        agent.save(SAVE_PATH)
+
+    agent.save(SAVE_PATH)
 
 
 if __name__ == '__main__':
-    evaluate(10, stochastic=False)
+    train()

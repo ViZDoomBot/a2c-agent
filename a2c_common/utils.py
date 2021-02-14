@@ -47,7 +47,7 @@ def get_expected_return(
     Compute expected returns per timestep.
     :param rewards:
     :param dones:
-    :param next_value: the value of the next state given by the critic network.
+    :param next_value: the value of the last next state given by the critic network.
     :param gamma
     :param standardize: whether standardize the resulting sequence of returns or not
      (i.e. to have zero mean and unit standard deviation).
@@ -58,13 +58,15 @@ def get_expected_return(
     rewards = tf.cast(rewards[::-1], dtype=tf.float32)
     dones = tf.cast(dones[::-1], dtype=tf.float32)
 
-    prev_returns_i = next_value
-    prev_returns_i_shape = prev_returns_i.shape
+    # TODO: decide whether to use next_value or not
+    # prev_returns_i = next_value
+    prev_returns_i = 0.0
+    # prev_returns_i_shape = prev_returns_i.shape
     for i in tf.range(n):
         returns_i = rewards[i] + gamma * prev_returns_i * (1.0 - dones[i])
         returns = returns.write(i, returns_i)
         prev_returns_i = returns_i
-        prev_returns_i.set_shape(prev_returns_i_shape)
+        # prev_returns_i.set_shape(prev_returns_i_shape)
 
     returns = returns.stack()[::-1]
 

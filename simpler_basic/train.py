@@ -40,7 +40,7 @@ def train():
     model.summary()
 
     # create agent and try to load model
-    agent = A2CAgent(model, game)
+    agent = A2CAgent(model, game, NUM_ACTIONS)
     if LOAD_PATH is None or not os.path.exists(LOAD_PATH):
         print('No saved model found, training from scratch')
     else:
@@ -57,8 +57,10 @@ def train():
                 _ = game.reset()
                 episode_reward = float(agent.train_step(
                     MAX_STEPS_PER_EPISODE, BATCH_SIZE,
-                    optimizer, DISCOUNT_FACTOR, ENTROPY_COFF,
+                    optimizer, DISCOUNT_FACTOR,
+                    ENTROPY_COFF, CRITIC_COFF,
                     reward_shaping=False,
+                    standardize_returns=STANDARDIZE_RETURNS,
                 ))
                 t.set_description(f'Episode {i}')
                 t.set_postfix(

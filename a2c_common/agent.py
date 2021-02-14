@@ -21,12 +21,12 @@ class A2CAgent(object):
             self,
             model: ActorCritic,
             game: GameWrapper,
-            # num_actions: int,
+            num_actions: int,
             # input_shape: Tuple[int, int] = (120, 120),
     ):
         self.model = model
         self.game = game
-        # self.num_actions = num_actions
+        self.num_actions = num_actions
         # self.input_shape = input_shape
 
     def set_game_wrapper(self, game: GameWrapper):
@@ -41,6 +41,7 @@ class A2CAgent(object):
         """
         state = tf.expand_dims(state, 0)
         action_probs, _ = self.model(state)
+        # print(f'action_probs: {action_probs}')
 
         if stochastic:
             action = tf.random.categorical(action_probs, 1)[0, 0]
@@ -56,8 +57,10 @@ class A2CAgent(object):
         :param reward_shaping
         :return:
         """
-        action_probs_raw = tf.TensorArray(dtype=tf.float32, size=0, dynamic_size=True)
-        action_probs = tf.TensorArray(dtype=tf.float32, size=0, dynamic_size=True)
+        states = tf.TensorArray(dtype=tf.float32, size=0, dynamic_size=True)
+        actions = tf.TensorArray(dtype=tf.int32, size=0, dynamic_size=True)
+        # action_probs_raw = tf.TensorArray(dtype=tf.float32, size=0, dynamic_size=True)
+        # action_probs = tf.TensorArray(dtype=tf.float32, size=0, dynamic_size=True)
         values = tf.TensorArray(dtype=tf.float32, size=0, dynamic_size=True)
         rewards = tf.TensorArray(dtype=tf.float32, size=0, dynamic_size=True)
         dones = tf.TensorArray(dtype=tf.bool, size=0, dynamic_size=True)
@@ -65,18 +68,21 @@ class A2CAgent(object):
         state = self.game.get_state()
         state_shape = state.shape
         for t in tf.range(batch_size):
+            states = states.write(t, state)
+
             # run the model and to get action probabilities and critic value
             state = tf.expand_dims(state, axis=0)
-            action_probs_raw_t, value = self.model(state)
+            action_dist_t, value = self.model(state)  # action_dist_t = action distribution at time t
             # print(action_probs_raw_t)
             # print(value)
 
             # sample next action from the action probability distribution
-            action = tf.random.categorical(action_probs_raw_t, 1)[0, 0]
-            action_probs_t = action_probs_raw_t[0, action]
+            action = tf.random.categorical(action_dist_t, 1)[0, 0]
+            actions = actions.write(t, tf.cast(action, tf.int32))
+            # action_probs_t = action_probs_raw_t[0, action]
 
-            action_probs_raw = action_probs_raw.write(t, action_probs_raw_t[0])
-            action_probs = action_probs.write(t, action_probs_t)
+            # action_probs_raw = action_probs_raw.write(t, action_probs_raw_t[0])
+            # action_probs = action_probs.write(t, action_probs_t)
             values = values.write(t, tf.squeeze(value))
 
             # perform action in game env
@@ -92,8 +98,10 @@ class A2CAgent(object):
             if done:
                 state = self.game.reset()
 
-        action_probs_raw = action_probs_raw.stack()
-        action_probs = action_probs.stack()
+        states = states.stack()
+        actions = actions.stack()
+        # action_probs_raw = action_probs_raw.stack()
+        # action_probs = action_probs.stack()
         values = values.stack()
         rewards = rewards.stack()
         dones = dones.stack()
@@ -106,7 +114,7 @@ class A2CAgent(object):
             _, value = self.model(state)
             next_value = tf.stop_gradient(value[0, 0])
 
-        return action_probs_raw, action_probs, values, rewards, dones, next_value
+        return states, actions, values, rewards, dones, next_value
 
     # XXX: currently using tf.function will cause ViZDoom running abnormally...
     # @tf.function
@@ -117,7 +125,9 @@ class A2CAgent(object):
             optimizer: tf.keras.optimizers.Optimizer,
             gamma: float = 0.99,
             entropy_coff: float = 0.0001,
+            critic_coff: float = 0.5,
             reward_shaping: bool = False,
+            standardize_returns: bool = True,
             clip_norm: float = 5.0,
     ) -> tf.Tensor:
         """
@@ -127,7 +137,9 @@ class A2CAgent(object):
         :param optimizer
         :param gamma
         :param entropy_coff
+        :param critic_coff
         :param reward_shaping
+        :param standardize_returns
         :param clip_norm
         :return:
         """
@@ -136,31 +148,58 @@ class A2CAgent(object):
         episode_reward = tf.constant(0.0, dtype=tf.float32)
 
         for _ in tf.range(batch_n):
+            # run the model for one batch to collect training data
+            states, actions, values, rewards, dones, next_value = self.run_batch(
+                batch_size, reward_shaping
+            )
+            # print(f"values: {values}")
+            # print(f"rewards: {rewards}")
+            # print(f"dones: {dones}")
+            # print(f"next_value: {next_value}")
+
+            # one-hot encodings for actions
+            action_one_hots = tf.one_hot(actions, depth=self.num_actions)
+            # print(actions)
+            # print(action_one_hots)
+
+            # calculate expected returns
+            returns = get_expected_return(rewards, dones, next_value, gamma, standardize_returns)
+            # print(f"rewards: {rewards}")
+            # print(f"dones: {dones}")
+            # print(f"next_value: {next_value}")
+            # print(f"returns: {returns}")
+
+            # calculate advantages
+            advantages = returns - values
+            # print(f"advantages: {advantages}")
+
+            # convert training data to appropriate TF tensor shapes
+            returns = tf.expand_dims(returns, -1)  # shape = (batch_size, 1)
+
             with tf.GradientTape() as tape:
-                # run the model for one batch to collect training data
-                action_probs_raw, action_probs, values, rewards, dones, next_value = self.run_batch(
-                    batch_size, reward_shaping
-                )
-                # calculate expected returns
-                returns = get_expected_return(rewards, dones, next_value, gamma)
-                # convert training data to appropriate TF tensor shapes
-                action_probs, values, returns = [
-                    tf.expand_dims(x, -1) for x in [action_probs, values, returns]]
+                # forward pass
+                action_dists, values_pred = self.model(states)
+                # print(f"values_pred: {values_pred}")
+
+                # collect action_probs from action_dists
+                action_probs = tf.reduce_sum(action_dists * action_one_hots, axis=-1)
+                # print(f"action_dists: {action_dists}")
+                # print(f"action_probs: {action_probs}")
+
                 # calculate loss
-                loss = compute_loss(action_probs_raw, action_probs, values, returns, entropy_coff)
-                # tf.print("rewards:", rewards)
-                # print("dones:", dones)
-                # print("next_value:", next_value)
-                # print("returns:", returns)
-                tf.print("loss:", loss)
+                loss = compute_loss(
+                    action_dists, action_probs,
+                    values_pred, returns, advantages,
+                    entropy_coff, critic_coff,
+                )
+                print(f"loss: {loss}")
 
             grads = tape.gradient(loss, self.model.trainable_variables)
             grads, global_norm = tf.clip_by_global_norm(grads, clip_norm)
-            print("grads global norm:", global_norm)
+            print(f"global_norm: {global_norm}")
             optimizer.apply_gradients(zip(grads, self.model.trainable_variables))
             batch_reward = tf.math.reduce_sum(rewards)
             episode_reward += batch_reward
-            # tf.print("batch_reward:", batch_reward)
 
         return episode_reward
 
