@@ -59,8 +59,8 @@ def get_expected_return(
     dones = tf.cast(dones[::-1], dtype=tf.float32)
 
     # TODO: decide whether to use next_value or not
-    # prev_returns_i = next_value
-    prev_returns_i = 0.0
+    prev_returns_i = next_value
+    # prev_returns_i = 0.0
     # prev_returns_i_shape = prev_returns_i.shape
     for i in tf.range(n):
         returns_i = rewards[i] + gamma * prev_returns_i * (1.0 - dones[i])

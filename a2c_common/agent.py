@@ -12,7 +12,7 @@ import tensorflow as tf
 from a2c_common.model import ActorCritic
 from a2c_common.game_wrapper import GameWrapper
 from a2c_common.utils import get_expected_return
-from a2c_common.loss import compute_loss
+from a2c_common.loss import compute_loss, compute_loss_ppo
 from typing import Tuple, List
 
 
@@ -198,6 +198,105 @@ class A2CAgent(object):
             grads, global_norm = tf.clip_by_global_norm(grads, clip_norm)
             print(f"global_norm: {global_norm}")
             optimizer.apply_gradients(zip(grads, self.model.trainable_variables))
+            batch_reward = tf.math.reduce_sum(rewards)
+            episode_reward += batch_reward
+
+        return episode_reward
+
+    # XXX: currently using tf.function will cause ViZDoom running abnormally...
+    # @tf.function
+    def train_step_ppo(
+            self,
+            max_steps_per_episode: int,
+            batch_size: int,
+            optimizer: tf.keras.optimizers.Optimizer,
+            gamma: float = 0.99,
+            entropy_coff: float = 0.0001,
+            critic_coff: float = 0.5,
+            reward_shaping: bool = False,
+            standardize_returns: bool = True,
+            clip_norm: float = 5.0,
+            epochs_per_batch: int = 10,
+            epsilon: float = 0.2,
+    ) -> tf.Tensor:
+        """
+        Run a model training episode for max_steps_per_episode steps using PPO loss.
+        :param max_steps_per_episode
+        :param batch_size
+        :param optimizer
+        :param gamma
+        :param entropy_coff
+        :param critic_coff
+        :param reward_shaping
+        :param standardize_returns
+        :param clip_norm
+        :param epochs_per_batch: how many epochs of training to run for each batch.
+        :param epsilon: used for PPO ratio clipping.
+        :return:
+        """
+        # divide episode steps into batches (ignoring remainder)
+        batch_n = max_steps_per_episode // batch_size
+        episode_reward = tf.constant(0.0, dtype=tf.float32)
+
+        for _ in tf.range(batch_n):
+            # run the model for one batch to collect training data
+            states, actions, values, rewards, dones, next_value = self.run_batch(
+                batch_size, reward_shaping
+            )
+            # print(f"values: {values}")
+            # print(f"rewards: {rewards}")
+            # print(f"dones: {dones}")
+            # print(f"next_value: {next_value}")
+
+            # one-hot encodings for actions
+            action_one_hots = tf.one_hot(actions, depth=self.num_actions)
+            # print(actions)
+            # print(action_one_hots)
+
+            # get action_probs before updating the network
+            action_dists, _ = self.model(states)
+            action_probs_old = tf.reduce_sum(action_dists * action_one_hots, axis=-1)
+            # print(f"action_probs_old: {action_probs_old}")
+
+            # calculate expected returns
+            returns = get_expected_return(rewards, dones, next_value, gamma, standardize_returns)
+            # print(f"rewards: {rewards}")
+            # print(f"dones: {dones}")
+            # print(f"next_value: {next_value}")
+            # print(f"returns: {returns}")
+
+            # calculate advantages
+            advantages = returns - values
+            # print(f"advantages: {advantages}")
+
+            # convert training data to appropriate TF tensor shapes
+            returns = tf.expand_dims(returns, -1)  # shape = (batch_size, 1)
+
+            # train the network on this batch for a number of epochs
+            for _ in range(epochs_per_batch):
+                with tf.GradientTape() as tape:
+                    # forward pass
+                    action_dists, values_pred = self.model(states)
+                    # print(f"values_pred: {values_pred}")
+
+                    # collect action_probs from action_dists
+                    action_probs = tf.reduce_sum(action_dists * action_one_hots, axis=-1)
+                    # print(f"action_dists: {action_dists}")
+                    # print(f"action_probs: {action_probs}")
+
+                    # calculate loss
+                    loss = compute_loss_ppo(
+                        action_dists, action_probs, action_probs_old,
+                        values_pred, returns, advantages,
+                        entropy_coff, critic_coff, epsilon,
+                    )
+                    print(f"loss: {loss}")
+
+                grads = tape.gradient(loss, self.model.trainable_variables)
+                grads, global_norm = tf.clip_by_global_norm(grads, clip_norm)
+                print(f"global_norm: {global_norm}")
+                optimizer.apply_gradients(zip(grads, self.model.trainable_variables))
+
             batch_reward = tf.math.reduce_sum(rewards)
             episode_reward += batch_reward
 

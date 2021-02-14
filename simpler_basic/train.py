@@ -55,12 +55,14 @@ def train():
         with tqdm.trange(TOTAL_EPISODES) as t:
             for i in t:
                 _ = game.reset()
-                episode_reward = float(agent.train_step(
+                episode_reward = float(agent.train_step_ppo(
                     MAX_STEPS_PER_EPISODE, BATCH_SIZE,
                     optimizer, DISCOUNT_FACTOR,
                     ENTROPY_COFF, CRITIC_COFF,
                     reward_shaping=False,
                     standardize_returns=STANDARDIZE_RETURNS,
+                    epochs_per_batch=EPOCHS_PER_BATCH,
+                    epsilon=EPSILON,
                 ))
                 t.set_description(f'Episode {i}')
                 t.set_postfix(
