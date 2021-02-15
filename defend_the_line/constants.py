@@ -13,7 +13,7 @@ SCENARIO_CFG_PATH = "../scenarios/defend_the_line.cfg"
 
 # atomic actions
 NUM_ATOMIC_ACTIONS = 3
-TURN_lEFT = 0
+TURN_LEFT = 0
 TURN_RIGHT = 1
 ATTACK = 2
 

@@ -13,7 +13,7 @@ SCENARIO_CFG_PATH = "../scenarios/predict_position.cfg"
 
 # atomic actions
 NUM_ATOMIC_ACTIONS = 3
-TURN_lEFT = 0
+TURN_LEFT = 0
 TURN_RIGHT = 1
 ATTACK = 2
 
@@ -30,7 +30,7 @@ def _expand_action(*args) -> List[bool]:
 # ACTION_LIST = [list(a) for a in it.product([False, True], repeat=NUM_ATOMIC_ACTIONS)]
 ACTION_LIST = [
     _expand_action(),
-    _expand_action(TURN_lEFT),
+    _expand_action(TURN_LEFT),
     _expand_action(TURN_RIGHT),
     _expand_action(ATTACK),
 ]
