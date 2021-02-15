@@ -47,6 +47,10 @@ def evaluate(episodes_to_eval: int = 10, stochastic: bool = True):
         agent.load(LOAD_PATH)
         print(f'Model loaded from {LOAD_PATH}')
 
+    # bootstrap the network
+    random_state = np.random.normal(size=(RESIZED_HEIGHT, RESIZED_WIDTH, HISTORY_LENGTH))
+    agent.get_action(random_state)
+
     # evaluation loop
     rewards = []
     with tqdm.trange(episodes_to_eval) as t:

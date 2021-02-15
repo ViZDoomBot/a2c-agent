@@ -6,6 +6,7 @@
 # @Desc  : utils
 
 import cv2
+import io
 import numpy as np
 import tensorflow as tf
 
@@ -23,6 +24,9 @@ def process_frame(frame, shape=(120, 120), normalize=True):
 
     if len(frame.shape) < 3:
         frame = np.expand_dims(frame, axis=-1)
+    else:
+        # (ch, h, w) -> (h, w, ch)
+        frame = frame.transpose(1, 2, 0)
 
     if frame.shape[-1] > 1:
         frame = cv2.cvtColor(frame, cv2.COLOR_RGB2GRAY)
@@ -34,6 +38,19 @@ def process_frame(frame, shape=(120, 120), normalize=True):
         frame = frame.astype('float32') / 255.0
 
     return frame.astype('float32')
+
+
+def get_img_from_fig(fig, dpi=180, rgb=True):
+    buf = io.BytesIO()
+    fig.savefig(buf, format="png", dpi=dpi)
+    buf.seek(0)
+    img_arr = np.frombuffer(buf.getvalue(), dtype=np.uint8)
+    buf.close()
+    img = cv2.imdecode(img_arr, 1)
+    if rgb:
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+
+    return img
 
 
 def get_expected_return(

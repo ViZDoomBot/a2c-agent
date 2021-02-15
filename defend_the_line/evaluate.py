@@ -57,6 +57,10 @@ def evaluate(episodes_to_eval: int = 10, stochastic: bool = True):
             t.set_postfix(
                 episode_reward=r)
 
+    # bootstrap the network
+    random_state = np.random.normal(size=(RESIZED_HEIGHT, RESIZED_WIDTH, HISTORY_LENGTH))
+    agent.get_action(random_state)
+
     rewards = np.array(rewards, dtype=np.float32)
     print(f'avg: {rewards.mean()}, std: {rewards.std()}, min: {rewards.min()}, max: {rewards.max()}')
 

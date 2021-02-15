@@ -48,18 +48,22 @@ def train():
         print(f'Model loaded from {LOAD_PATH}')
 
     # create optimizer
-    optimizer = tf.keras.optimizers.RMSprop(LEARNING_RATE)
+    # optimizer = tf.keras.optimizers.RMSprop(LEARNING_RATE)
+    optimizer = tf.keras.optimizers.Adam(LEARNING_RATE)
 
     # train loop
     try:
         with tqdm.trange(TOTAL_EPISODES) as t:
             for i in t:
                 _ = game.reset()
-                episode_reward = float(agent.train_step(
+                episode_reward = float(agent.train_step_ppo(
                     MAX_STEPS_PER_EPISODE, BATCH_SIZE,
-                    optimizer, DISCOUNT_FACTOR, ENTROPY_COFF,
+                    optimizer, DISCOUNT_FACTOR,
+                    ENTROPY_COFF, CRITIC_COFF,
                     reward_shaping=False,
-                    clip_norm=5.0,
+                    standardize_returns=STANDARDIZE_RETURNS,
+                    epochs_per_batch=EPOCHS_PER_BATCH,
+                    epsilon=EPSILON,
                 ))
                 t.set_description(f'Episode {i}')
                 t.set_postfix(

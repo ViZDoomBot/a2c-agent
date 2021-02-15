@@ -4,3 +4,4 @@ __pycache__/
 */_vizdoom/
 */saved_model*/
 */tf_board/
+*.mp4

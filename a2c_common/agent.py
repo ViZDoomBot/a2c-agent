@@ -32,12 +32,12 @@ class A2CAgent(object):
     def set_game_wrapper(self, game: GameWrapper):
         self.game = game
 
-    def get_action(self, state: np.ndarray, stochastic: bool = True) -> int:
+    def get_action(self, state: np.ndarray, stochastic: bool = True) -> Tuple[int, np.ndarray]:
         """
         Get action to take given current state
         :param state: game state of shape (height, width, num_channels).
         :param stochastic: randomly sample an action from policy probs if True, choose argmax action o.w.
-        :return: chosen action id.
+        :return: chosen action id, along with distribution of actions (output of policy network)
         """
         state = tf.expand_dims(state, 0)
         action_probs, _ = self.model(state)
@@ -48,7 +48,7 @@ class A2CAgent(object):
         else:
             action = tf.math.argmax(action_probs, -1)[0]
 
-        return int(action)
+        return int(action), action_probs
 
     def run_batch(self, batch_size: int, reward_shaping: bool = False) -> List[tf.Tensor]:
         """
@@ -315,7 +315,7 @@ class A2CAgent(object):
         reward = 0.0
         done = False
         while not done:
-            action = self.get_action(state, stochastic)
+            action, _ = self.get_action(state, stochastic)
             state, r, done, _ = self.game.step(action, smooth_rendering=True)
             reward += float(r)
         return reward

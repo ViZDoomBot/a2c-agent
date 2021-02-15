@@ -15,6 +15,7 @@ sys.path.append(os.path.normpath(os.path.join(SCRIPT_DIR, PACKAGE_PARENT)))
 import tqdm
 import numpy as np
 import tensorflow as tf
+import matplotlib.pyplot as plt
 
 from a2c_common.model import ActorCritic
 from a2c_common.agent import A2CAgent
@@ -46,6 +47,10 @@ def evaluate(episodes_to_eval: int = 10, stochastic: bool = True):
     else:
         agent.load(LOAD_PATH)
         print(f'Model loaded from {LOAD_PATH}')
+
+    # bootstrap the network
+    random_state = np.random.normal(size=(RESIZED_HEIGHT, RESIZED_WIDTH, HISTORY_LENGTH))
+    agent.get_action(random_state)
 
     # evaluation loop
     rewards = []

@@ -25,7 +25,8 @@ class GameWrapper:
             history_length=4,
             visible=False,
             is_sync=True,
-            reward_shaper: 'IRewardShaper' = None
+            reward_shaper: 'IRewardShaper' = None,
+            screen_format=None,
     ):
         game = vzd.DoomGame()
         game.load_config(scenario_cfg_path)
@@ -34,7 +35,10 @@ class GameWrapper:
             game.set_mode(vzd.Mode.PLAYER)
         else:
             game.set_mode(vzd.Mode.ASYNC_PLAYER)
-        game.set_screen_format(vzd.ScreenFormat.GRAY8)
+        if screen_format is None:
+            game.set_screen_format(vzd.ScreenFormat.GRAY8)
+        else:
+            game.set_screen_format(screen_format)
         game.set_screen_resolution(vzd.ScreenResolution.RES_640X480)
         if reward_shaper is not None:
             game.set_available_game_variables(reward_shaper.get_subscribed_game_var_list())
@@ -67,12 +71,14 @@ class GameWrapper:
     def get_state(self) -> np.ndarray:
         return self.state.copy()
 
-    def step(self, action, smooth_rendering=False) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    def step(self, action, smooth_rendering=False, return_frames=False) \
+            -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
         """Performs an action and observes the result
         Arguments:
             action: An integer describe action the agent chose
             smooth_rendering: Whether render intermediate states to make game looks smoother;
                 skip rendering tics could potentially expedite training
+            return_frames: Whether to return all raw frames in this step
         Returns:
             state: New game state as a result of that action
             reward: The reward for taking that action
@@ -80,6 +86,7 @@ class GameWrapper:
             shaping_reward: Optional shaping reward for training. Applicable only if
                 self.reward_shaper is not None
         """
+        frames = []
         if not smooth_rendering:
             # make_action will not update(render) skipped tics
             reward = self.env.make_action(self.action_list[action], self.frames_to_skip)
@@ -88,12 +95,14 @@ class GameWrapper:
             new_frame = state.screen_buffer if state is not None else self.frame
             shaping_reward = self.reward_shaper.calc_reward(state.game_variables) \
                 if self.reward_shaper is not None and state is not None else 0.0
+            frames.append(new_frame)
         else:
             self.env.set_action(self.action_list[action])
             reward = 0.0
             new_frame = self.frame
             done = self.env.is_episode_finished()
             new_vars = self.env.get_state().game_variables
+            frames.append(new_frame)
             for _ in range(self.frames_to_skip):
                 self.env.advance_action()
                 done = self.env.is_episode_finished()
@@ -104,16 +113,25 @@ class GameWrapper:
                     state = self.env.get_state()
                     new_frame = state.screen_buffer
                     new_vars = state.game_variables
+                    frames.append(new_frame)
             shaping_reward = self.reward_shaper.calc_reward(new_vars) \
                 if self.reward_shaper is not None else 0.0
 
         processed_frame = process_frame(new_frame, self.preprocess_shape)
         self.state = np.append(self.state[:, :, 1:], processed_frame, axis=-1)
+        self.frame = new_frame
 
-        return self.get_state().astype('float32'), \
-               np.array(reward, dtype='float32'), \
-               np.array(done, dtype='bool'), \
-               np.array(shaping_reward, dtype='float32')
+        if return_frames:
+            return self.get_state().astype('float32'), \
+                   np.array(reward, dtype='float32'), \
+                   np.array(done, dtype='bool'), \
+                   np.array(shaping_reward, dtype='float32'), \
+                   frames
+        else:
+            return self.get_state().astype('float32'), \
+                   np.array(reward, dtype='float32'), \
+                   np.array(done, dtype='bool'), \
+                   np.array(shaping_reward, dtype='float32')
 
     def tf_step(self, action: tf.Tensor, smooth_rendering: tf.Tensor = tf.constant(False)) -> List[tf.Tensor]:
         """

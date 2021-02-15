@@ -21,6 +21,7 @@ from a2c_common.agent import A2CAgent
 from a2c_common.game_wrapper import GameWrapper
 from constants import *
 from params import *
+from reward_shaper import RewardShaper
 
 
 def train():
@@ -31,7 +32,7 @@ def train():
         FRAMES_TO_SKIP, HISTORY_LENGTH,
         visible=VISIBLE_TRAINING,
         is_sync=True,
-        reward_shaper=None,
+        reward_shaper=RewardShaper() if REWARD_SHAPING else None,
     )
 
     # create and build model
@@ -55,10 +56,14 @@ def train():
         with tqdm.trange(TOTAL_EPISODES) as t:
             for i in t:
                 _ = game.reset()
-                episode_reward = float(agent.train_step(
+                episode_reward = float(agent.train_step_ppo(
                     MAX_STEPS_PER_EPISODE, BATCH_SIZE,
-                    optimizer, DISCOUNT_FACTOR, ENTROPY_COFF,
+                    optimizer, DISCOUNT_FACTOR,
+                    ENTROPY_COFF, CRITIC_COFF,
                     reward_shaping=False,
+                    standardize_returns=STANDARDIZE_RETURNS,
+                    epochs_per_batch=EPOCHS_PER_BATCH,
+                    epsilon=EPSILON,
                 ))
                 t.set_description(f'Episode {i}')
                 t.set_postfix(

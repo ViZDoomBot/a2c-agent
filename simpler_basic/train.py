@@ -48,7 +48,8 @@ def train():
         print(f'Model loaded from {LOAD_PATH}')
 
     # create optimizer
-    optimizer = tf.keras.optimizers.RMSprop(LEARNING_RATE)
+    # optimizer = tf.keras.optimizers.RMSprop(LEARNING_RATE)
+    optimizer = tf.keras.optimizers.Adam(LEARNING_RATE, )
 
     # train loop
     try:

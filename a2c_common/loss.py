@@ -95,12 +95,12 @@ def compute_loss_ppo(
     # print(f'ratios: {ratios}')
     # print(f'policy_loss_no_clip: {policy_loss_no_clip}')
     # print(f'policy_loss_clip: {policy_loss_clip}')
-    print(f'policy_loss: {policy_loss}')
+    # print(f'policy_loss: {policy_loss}')
     print(f'entropy_loss: {entropy_loss}')
-    print(f'actor_loss: {actor_loss}')
+    # print(f'actor_loss: {actor_loss}')
 
     # compute critic loss
     critic_loss = tf.cast(_huber_loss(returns, values), dtype='float32')
-    print(f'critic_loss: {critic_loss}')
+    # print(f'critic_loss: {critic_loss}')
 
     return actor_loss + critic_coff * critic_loss
