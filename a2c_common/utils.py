@@ -9,16 +9,19 @@ import cv2
 import io
 import numpy as np
 import tensorflow as tf
+import math
 
 # Small epsilon value for stabilizing division operations
 _eps = np.finfo(np.float32).eps.item()
 
 
-def process_frame(frame, shape=(120, 120), normalize=True):
+def process_frame(frame, shape=(120, 120), normalize=True, zoom_in=False, zoom_in_ratio=0.5):
     """Preprocesses a frame to shape[0] x shape[1] x 1 grayscale
     :param frame: The frame to process.  Must have values ranging from 0-255.
     :param shape: Desired shape to return.
     :param normalize: Whether to normalize the frame by dividing 255.
+    :param zoom_in: If true, perform zoom in on the frame and return the zoomed frame.
+    :param zoom_in_ratio: Only applicable if zoom_in = True.
     """
     frame = frame.astype(np.uint8)  # cv2 requires np.uint8, other dtypes will not work
 
@@ -30,6 +33,12 @@ def process_frame(frame, shape=(120, 120), normalize=True):
 
     if frame.shape[-1] > 1:
         frame = cv2.cvtColor(frame, cv2.COLOR_RGB2GRAY)
+
+    if zoom_in:
+        # zoom into the center by cropping
+        h, w = frame.shape[0], frame.shape[1]
+        dh, dw = math.floor(h * zoom_in_ratio / 2.0), math.floor(w * zoom_in_ratio / 2.0)
+        frame = frame[dh:h - dh, dw:w - dw, :]
 
     frame = cv2.resize(frame, shape, interpolation=cv2.INTER_NEAREST)
     frame = frame.reshape((*shape, 1))

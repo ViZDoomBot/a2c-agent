@@ -27,6 +27,8 @@ class GameWrapper:
             is_sync=True,
             reward_shaper: 'IRewardShaper' = None,
             screen_format=None,
+            use_attention=False,
+            attention_ratio=0.5,
     ):
         game = vzd.DoomGame()
         game.load_config(scenario_cfg_path)
@@ -49,9 +51,12 @@ class GameWrapper:
         self.frames_to_skip = frames_to_skip
         self.history_length = history_length
         self.reward_shaper = reward_shaper
+        self.use_attention = use_attention
+        self.attention_ratio = attention_ratio
 
-        self.state = None
         self.frame = None
+        self.state = None
+        self.state_attention = None
 
     def reset(self) -> np.ndarray:
         """
@@ -65,11 +70,20 @@ class GameWrapper:
 
         # For the initial state, we stack the first frame history_length times
         self.state = np.repeat(process_frame(self.frame, self.preprocess_shape), self.history_length, axis=-1)
+        if self.use_attention:
+            self.state_attention = np.repeat(
+                process_frame(self.frame, self.preprocess_shape, zoom_in=True, zoom_in_ratio=self.attention_ratio),
+                self.history_length, axis=-1
+            )
 
         return self.get_state()
 
     def get_state(self) -> np.ndarray:
-        return self.state.copy()
+        if self.use_attention:
+            # stack normal state together with attention state
+            return np.concatenate((self.state, self.state_attention), axis=-1)
+        else:
+            return self.state.copy()
 
     def step(self, action, smooth_rendering=False, return_frames=False) \
             -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
@@ -117,9 +131,13 @@ class GameWrapper:
             shaping_reward = self.reward_shaper.calc_reward(new_vars) \
                 if self.reward_shaper is not None else 0.0
 
+        self.frame = new_frame
         processed_frame = process_frame(new_frame, self.preprocess_shape)
         self.state = np.append(self.state[:, :, 1:], processed_frame, axis=-1)
-        self.frame = new_frame
+        if self.use_attention:
+            processed_frame_attention = process_frame(
+                new_frame, self.preprocess_shape, zoom_in=True, zoom_in_ratio=self.attention_ratio)
+            self.state_attention = np.append(self.state_attention[:, :, 1:], processed_frame_attention, axis=-1)
 
         if return_frames:
             return self.get_state().astype('float32'), \
