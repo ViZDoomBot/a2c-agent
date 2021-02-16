@@ -119,11 +119,11 @@ class GameWrapper:
             frames.append(new_frame)
             for _ in range(self.frames_to_skip):
                 self.env.advance_action()
+                reward += self.env.get_last_reward()
                 done = self.env.is_episode_finished()
                 if done:
                     break
                 else:
-                    reward += self.env.get_last_reward()
                     state = self.env.get_state()
                     new_frame = state.screen_buffer
                     new_vars = state.game_variables
