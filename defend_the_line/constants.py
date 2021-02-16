@@ -27,7 +27,13 @@ def _expand_action(*args) -> List[bool]:
 
 
 # action space (both atomic and combination actions)
-ACTION_LIST = [list(a) for a in it.product([False, True], repeat=NUM_ATOMIC_ACTIONS)]
+# ACTION_LIST = [list(a) for a in it.product([False, True], repeat=NUM_ATOMIC_ACTIONS)]
+ACTION_LIST = [
+    _expand_action(),
+    _expand_action(TURN_LEFT),
+    _expand_action(TURN_RIGHT),
+    _expand_action(ATTACK),
+]
 NUM_ACTIONS = len(ACTION_LIST)
 
 RESIZED_HEIGHT, RESIZED_WIDTH = 120, 120

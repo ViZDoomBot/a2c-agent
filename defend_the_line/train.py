@@ -49,7 +49,7 @@ def train():
         print(f'Model loaded from {LOAD_PATH}')
 
     # create optimizer
-    optimizer = tf.keras.optimizers.RMSprop(LEARNING_RATE)
+    optimizer = tf.keras.optimizers.Adam(LEARNING_RATE)
 
     # train loop
     try:
@@ -60,7 +60,7 @@ def train():
                     MAX_STEPS_PER_EPISODE, BATCH_SIZE,
                     optimizer, DISCOUNT_FACTOR,
                     ENTROPY_COFF, CRITIC_COFF,
-                    reward_shaping=False,
+                    reward_shaping=REWARD_SHAPING,
                     standardize_returns=STANDARDIZE_RETURNS,
                     epochs_per_batch=EPOCHS_PER_BATCH,
                     epsilon=EPSILON,

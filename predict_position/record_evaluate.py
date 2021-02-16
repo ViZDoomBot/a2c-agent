@@ -81,7 +81,8 @@ def record_evaluate(
     # generate prob histograms along with frames
     print("Composing frames...")
     rst_frames = []
-    action_names = ["None", "A", "R", "RA", "L", "LA", "LR", "LRA"]
+    # action_names = ["None", "A", "R", "RA", "L", "LA", "LR", "LRA"]
+    action_names = ["None", "L", "R", "A"]
     assert len(action_names) == NUM_ACTIONS
     for f, p in tqdm.tqdm(zip(frames, action_probs), total=len(frames)):
         fig, ax = plt.subplots(1, 2, gridspec_kw={'width_ratios': [2, 1]})
@@ -105,4 +106,4 @@ def record_evaluate(
 
 
 if __name__ == '__main__':
-    record_evaluate(10, False, f'evaluation_{datetime.now().strftime("%s")}.mp4')
+    record_evaluate(1, True, f'evaluation_{datetime.now().strftime("%s")}.mp4')
