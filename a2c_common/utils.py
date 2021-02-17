@@ -33,6 +33,7 @@ def process_frame(frame, shape=(120, 120), normalize=True, zoom_in=False, zoom_i
 
     if frame.shape[-1] > 1:
         frame = cv2.cvtColor(frame, cv2.COLOR_RGB2GRAY)
+        frame = np.expand_dims(frame, axis=-1)
 
     if zoom_in:
         # zoom into the center by cropping
